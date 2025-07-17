@@ -96,11 +96,15 @@
           </div>
           <form id="message-form" action="#">
             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-              <input class="mdl-textfield__input" type="text" id="message" autocomplete="off">
-              <label class="mdl-textfield__label" for="message">Message...</label>
+
+              <!--SMS max100 letras-->
+              <!--<input class="mdl-textfield__input" type="text" id="message" autocomplete="off">-->
+              <input class="mdl-textfield__input" type="text" id="message" autocomplete="off" maxlength="100">
+              <label class="mdl-textfield__label" for="message">SMS max100 letras</label>
+              <!--<span id="char-counter" style="font-size: 0.9em; color: #888; position: absolute; right: 0; bottom: 0;">0/100</span>-->
             </div>
             <button id="submit" disabled type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect">
-              Send
+              Enviar
             </button>
           </form>
           <form id="image-form" action="#">

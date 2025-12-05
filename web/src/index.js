@@ -237,7 +237,8 @@ function checkSignedInWithMessage() {
     return true;
   }
   var data = {
-    message: 'You must sign-in first',
+//    message: 'You must sign-in first',
+    message: 'Debes iniciar sesión primero',
     timeout: 2000
   };
   signInSnackbarElement.MaterialSnackbar.showSnackbar(data);

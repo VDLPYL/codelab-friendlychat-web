@@ -19,6 +19,9 @@ import {
   setDoc,
   updateDoc,
   doc,
+
+  deleteDoc,
+
   serverTimestamp,
   getDocs,
   where
@@ -89,6 +92,8 @@ function isUserSignedIn() {
   return !!getAuth().currentUser;
 }
 
+
+/*
 // Guardar mensaje texto
 async function saveMessage(messageText) {
   try {
@@ -102,6 +107,29 @@ async function saveMessage(messageText) {
     console.error('Error writing new message to Firebase Database', error);
   }
 }
+*/
+// Guardar mensaje texto
+async function saveMessage(messageText) {
+  try {
+    const user = getAuth().currentUser;
+
+    await addDoc(collection(getFirestore(), 'messages'), {
+      name: user.displayName,
+      uid: user.uid,              // ← OBLIGATORIO para poder borrar
+      text: messageText,
+      profilePicUrl: user.photoURL,
+      timestamp: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error writing new message to Firestore', error);
+  }
+}
+
+
+
+
+
+
 
 // Cargar mensajes + observer para el contador
 function loadMessages() {
@@ -121,6 +149,9 @@ function loadMessages() {
   });
 }
 
+
+
+/*
 // Guardar mensaje imagen
 async function saveImageMessage(file) {
   try {
@@ -142,6 +173,40 @@ async function saveImageMessage(file) {
     console.error('There was an error uploading a file to Cloud Storage:', error);
   }
 }
+*/
+// Guardar mensaje imagen
+async function saveImageMessage(file) {
+  try {
+    const user = getAuth().currentUser;
+
+    const messageRef = await addDoc(collection(getFirestore(), 'messages'), {
+      name: user.displayName,
+      uid: user.uid,                 // ← OBLIGATORIO
+      imageUrl: LOADING_IMAGE_URL,
+      profilePicUrl: user.photoURL,
+      timestamp: serverTimestamp()
+    });
+
+    const filePath = `${user.uid}/${messageRef.id}/${file.name}`;
+    const newImageRef = ref(getStorage(), filePath);
+
+    const fileSnapshot = await uploadBytesResumable(newImageRef, file);
+    const publicImageUrl = await getDownloadURL(newImageRef);
+
+    await updateDoc(messageRef, {
+      imageUrl: publicImageUrl,
+      storageUri: fileSnapshot.metadata.fullPath
+    });
+  } catch (error) {
+    console.error('There was an error uploading a file to Cloud Storage:', error);
+  }
+}
+
+
+
+
+
+
 
 // Guardar token de notificaciones (FCM)
 async function saveMessagingDeviceToken() {
@@ -176,7 +241,8 @@ function onMediaFileSelected(event) {
   imageFormElement.reset();
   if (!file.type.match('image.*')) {
     var data = {
-      message: 'You can only share images',
+//      message: 'You can only share images',
+      message: 'Solo puedes compartir imágenes',
       timeout: 2000
     };
     signInSnackbarElement.MaterialSnackbar.showSnackbar(data);
@@ -251,13 +317,26 @@ function resetMaterialTextfield(element) {
   element.parentNode.MaterialTextfield.boundUpdateClassesHandler();
 }
 
-// Template mensaje (sin cambios)
+/* Template mensaje (sin cambios) 14/12/2025
 var MESSAGE_TEMPLATE =
     '<div class="message-container">' +
       '<div class="spacing"><div class="pic"></div></div>' +
       '<div class="message"></div>' +
       '<div class="name"></div>' +
     '</div>';
+*/
+
+var MESSAGE_TEMPLATE =
+    '<div class="message-container">' +
+      '<input type="checkbox" class="delete-checkbox" />' +
+      '<div class="spacing"><div class="pic"></div></div>' +
+      '<div class="message"></div>' +
+      '<div class="name"></div>' +
+    '</div>';
+
+
+
+
 
 // Google profile pic
 function addSizeToGoogleProfilePic(url) {
@@ -306,6 +385,8 @@ function createAndInsertMessage(id, timestamp) {
   return div;
 }
 
+
+/*
 // Mostrar mensaje en UI (sin cambios)
 function displayMessage(id, timestamp, name, text, picUrl, imageUrl) {
   var div = document.getElementById(id) || createAndInsertMessage(id, timestamp);
@@ -339,6 +420,70 @@ function toggleButton() {
     submitButtonElement.setAttribute('disabled', 'true');
   }
 }
+*/
+// Mostrar mensaje en UI (sin cambios)
+function displayMessage(id, timestamp, name, text, picUrl, imageUrl) {
+  var div = document.getElementById(id) || createAndInsertMessage(id, timestamp);
+  if (picUrl) {
+    div.querySelector('.pic').style.backgroundImage =
+      'url(' + addSizeToGoogleProfilePic(picUrl) + ')';
+  }
+  div.querySelector('.name').textContent = name;
+  var messageElement = div.querySelector('.message');
+  if (text) {
+    messageElement.textContent = text;
+    messageElement.innerHTML = messageElement.innerHTML.replace(/\n/g, '<br>');
+  } else if (imageUrl) {
+    var image = document.createElement('img');
+    image.addEventListener('load', function() {
+      messageListElement.scrollTop = messageListElement.scrollHeight;
+    });
+    image.src = imageUrl + '&' + new Date().getTime();
+    messageElement.innerHTML = '';
+    messageElement.appendChild(image);
+  }
+  setTimeout(function() { div.classList.add('visible') }, 1);
+  messageListElement.scrollTop = messageListElement.scrollHeight;
+  messageInputElement.focus();
+}
+
+/* ⬇⬇⬇ PEGAR AQUÍ, JUSTO DEBAJO ⬇⬇⬇ */
+
+async function deleteSelectedMessages() {
+  const checked = document.querySelectorAll('.delete-checkbox:checked');
+
+  if (checked.length === 0) {
+    alert('No has seleccionado mensajes');
+    return;
+  }
+
+  if (!confirm('¿Seguro que deseas borrar los mensajes seleccionados?')) return;
+
+  const db = getFirestore();
+
+  for (const checkbox of checked) {
+    const messageDiv = checkbox.closest('.message-container');
+    const messageId = messageDiv.getAttribute('id');
+    await deleteDoc(doc(db, 'messages', messageId));
+  }
+}
+
+// Habilita/deshabilita el botón "Send"
+function toggleButton() {
+  if (messageInputElement.value && currentUserMessageCount < MAX_MESSAGES_PER_USER) {
+    submitButtonElement.removeAttribute('disabled');
+  } else {
+    submitButtonElement.setAttribute('disabled', 'true');
+  }
+}
+
+
+
+
+
+
+
+
 
 // Shortcuts a elementos DOM (igual que ya tienes)
 var messageListElement = document.getElementById('messages');
@@ -388,3 +533,14 @@ const firebaseApp = initializeApp(getFirebaseConfig());
 getPerformance();
 initFirebaseAuth();
 loadMessages();
+
+
+
+// nuevo código
+document.addEventListener('DOMContentLoaded', () => {
+  const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+
+  if (deleteSelectedBtn) {
+    deleteSelectedBtn.addEventListener('click', deleteSelectedMessages);
+  }
+});
